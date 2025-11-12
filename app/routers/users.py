@@ -6,16 +6,22 @@ router = APIRouter(
     tags=["Users"]
 )
 
-class UserDb(BaseModel):
+class UserBase(BaseModel):
+    username: str
+    password: str
+
+class UserIn(UserBase):
+    name: str
+
+class UserDb(UserIn):
     id: int
-    name: str
-    username: str
-    password: str
-    
-class UserIn(BaseModel):
-    username: str
-    password: str
-    name: str
+
+
+class UserLoginIn(UserBase):
+    pass
+
+class TokenOut(BaseModel):
+    token: str
     
 users: list[UserDb] = []
 
@@ -36,3 +42,24 @@ async def create_user(userIn: UserIn):
             password=userIn.password
         )
     )
+
+@router.post( "/login/",response_model=TokenOut, status_code=status.HTTP_200_OK)
+async def login(userLoginIn: UserLoginIn):
+    usersFound = [u for u in users if u.username == userLoginIn.username]
+    if not usersFound:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Username and/or password incorrect"
+        )
+    
+    user:UserDb = usersFound[0]
+    if user.password != userLoginIn.password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Username and/or password incorrect"
+        )
+    return TokenOut(
+        token=f"mytoken:{user.username}-{user.name}"
+    )
+
+    
