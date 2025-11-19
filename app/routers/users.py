@@ -1,4 +1,5 @@
-from fastapi import APIRouter, status, HTTPException
+from urllib import response
+from fastapi import APIRouter, status, HTTPException, Header
 from pydantic import BaseModel
 
 router = APIRouter(
@@ -16,6 +17,10 @@ class UserIn(UserBase):
 class UserDb(UserIn):
     id: int
 
+class UserOut(BaseModel):
+    id: int
+    name: str
+    username: str
 
 class UserLoginIn(UserBase):
     pass
@@ -62,4 +67,17 @@ async def login(userLoginIn: UserLoginIn):
         token=f"mytoken:{user.username}-{user.name}"
     )
 
+@router.get("/", response_model=list[UserOut], status_code=status.HTTP_200_OK)
+async def get_all_users(authorization: str = Header()):
+    print(authorization)
     
+    parts = authorization.split(":")
+    if len(parts) != 2 or parts[0] != "mytoken":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="forbidden"
+        )
+    return [
+        UserOut(id=userDb.id, name=userDb.name, username=userDb.username)
+        for userDb in users
+        ]
