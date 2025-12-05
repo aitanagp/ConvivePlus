@@ -8,7 +8,7 @@ class UserIn(UserBase):
     name: str
 
 class UserDb(UserIn):
-    id: int
+    id: int | None = None
 
 class UserOut(BaseModel):
     id: int
