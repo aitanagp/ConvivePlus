@@ -1,0 +1,36 @@
+services:
+  myapi:
+    build:
+      context: .
+      dockerfile: ./docker/fastapi/Dockerfile
+    ports:
+      - 8000:80
+    networks:
+      - myapi_network
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      - myapidb
+
+  myapidb:
+    image: mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_USER: myapi
+      MARIADB_PASSWORD: myapi
+      MARIADB_DATABASE: myapi
+    networks:
+      - myapi_network
+    volumes:
+      - ./myapidb_data:/data/db
+
+  myapiadminer:
+    image: adminer
+    ports:
+      - 8080:8080
+    networks:
+      - myapi_network
+
+networks:
+  myapi_network:
+    driver: bridge

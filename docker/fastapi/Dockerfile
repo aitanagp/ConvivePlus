@@ -8,6 +8,6 @@ RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
 
 COPY ./app /app/app
 
-RUN pip install --no-cache-dir --upgrade uvicorn
+# RUN pip install --no-cache-dir --upgrade uvicorn
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80", "--reload"]
