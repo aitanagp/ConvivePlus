@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+# --- MODELOS DE USUARIO ---
+
 class UserBase(BaseModel):
     username: str
     password: str
@@ -16,4 +18,24 @@ class UserOut(BaseModel):
     username: str
 
 class UserLoginIn(UserBase):
+    pass
+
+# --- MODELOS DE ALUMNOS ---
+
+class StudentBase(BaseModel):
+    name: str
+    surname: str
+    email: str
+    age: int
+
+class StudentIn(StudentBase):
+    name: str
+
+class StudentDb(StudentIn):
+    id: int | None = None
+
+class StudentOut(StudentBase):
+    id: int
+
+class StudentLoginIn(StudentBase):
     pass
