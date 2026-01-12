@@ -11,7 +11,7 @@ SECRET_KEY = "1234567890"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MIN = 7 * 24 * 60
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login/")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="v1/users/login/")
 
 
 class Token(BaseModel):

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 
 router = APIRouter(
-    prefix="/users",
+    prefix="v1/users",
     tags=["Users"]
 )
 

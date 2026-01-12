@@ -12,7 +12,7 @@ from app.auth.auth import (
 )
 from fastapi.security import OAuth2PasswordRequestForm
 
-router = APIRouter(prefix="/students", tags=["Students"])
+router = APIRouter(prefix="v1/students", tags=["Students"])
 
 
 @router.post("/", response_model=StudentOut, status_code=status.HTTP_201_CREATED)
