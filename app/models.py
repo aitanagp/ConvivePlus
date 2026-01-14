@@ -20,6 +20,18 @@ class UserOut(BaseModel):
 class UserLoginIn(UserBase):
     pass
 
+# --- MODELOS DEL JSON ---
+class UserCreateJson(BaseModel):
+    id_usuario: int
+    email: str
+    nombre: str
+    contrasena: str
+
+class UserEditJson(BaseModel):
+    id_usuario: int
+    email: str
+    nombre: str
+
 # --- MODELOS DE ALUMNOS ---
 
 class StudentBase(BaseModel):

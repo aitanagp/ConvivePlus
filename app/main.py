@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.routers import users
+from app.routers import students, users
 
 app = FastAPI(debug=True)
 app.include_router(users.router)

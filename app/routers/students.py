@@ -1,7 +1,7 @@
-from app.database import users
+from app.database import get_user_by_username
 from fastapi import APIRouter, status, HTTPException, Depends
 from app.models import StudentIn, StudentDb, StudentOut, StudentLoginIn, StudentBase
-from app.database import students, insert_student
+from app.database import get_all_students_db, insert_student
 from app.auth.auth import (
     create_access_token,
     Token,
@@ -12,7 +12,7 @@ from app.auth.auth import (
 )
 from fastapi.security import OAuth2PasswordRequestForm
 
-router = APIRouter(prefix="v1/students", tags=["Students"])
+router = APIRouter(prefix="/v1/students", tags=["Students"])
 
 
 @router.post("/", response_model=StudentOut, status_code=status.HTTP_201_CREATED)
