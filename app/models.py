@@ -1,6 +1,11 @@
 from pydantic import BaseModel
 
-# --- MODELOS DE USUARIO ---
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: str | None = None
 
 class UserBase(BaseModel):
     username: str
@@ -11,39 +16,46 @@ class UserIn(UserBase):
 
 class UserDb(UserIn):
     id: int | None = None
+    role: str | None = None
 
 class UserOut(BaseModel):
     id: int
     name: str
     username: str
+    role: str | None = None
 
 class UserLoginIn(UserBase):
     pass
 
-# --- MODELOS DEL JSON ---
+# MODELOS JSON
 class UserCreateJson(BaseModel):
-    id_usuario: int
     email: str
     nombre: str
     contrasena: str
 
 class UserEditJson(BaseModel):
-    id_usuario: int
-    email: str
     nombre: str
+    
+class UserChangePassword(BaseModel):
+    old_password: str
+    new_password: str
 
-# --- MODELOS DE ALUMNOS ---
+class UserEditProfile(BaseModel):
+    name: str | None = None
+    email: str | None = None
 
+# MODELOS DE ALUMNOS
 class StudentBase(BaseModel):
     name: str
     surname: str
     email: str
     age: int
+    student_group: str
 
 class StudentIn(StudentBase):
-    name: str
+    pass
 
-class StudentDb(StudentIn):
+class StudentDb(StudentBase): # Hereda de StudentBase para tener todos los campos
     id: int | None = None
 
 class StudentOut(StudentBase):
@@ -51,3 +63,16 @@ class StudentOut(StudentBase):
 
 class StudentLoginIn(StudentBase):
     pass
+
+class StudentImportJson(BaseModel):
+    name: str
+    surname: str
+    email: str
+    age: int
+    student_group: str
+
+# MODELOS DE ACTITUDES
+class CreateAttitude(BaseModel):
+    student_email: str 
+    type: str
+    motive: str

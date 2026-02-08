@@ -1,6 +1,7 @@
 import bcrypt
 
 from datetime import datetime, timedelta
+from fastapi import HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from pydantic import BaseModel
@@ -54,3 +55,5 @@ def decode_token(token: str) -> TokenData:
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"}
         )
+
+

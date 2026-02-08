@@ -55,16 +55,25 @@ def insert_student(student: StudentDb):
             conn.commit()
             return cursor.lastrowid
 
+def get_student_id_by_email(email: str):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = "SELECT id FROM STUDENT WHERE email = ?"
+            cursor.execute(sql, (email,))
+            result = cursor.fetchone()
+            if result:
+                return result[0]
+            return None
 
 def get_user_by_username(username: str) -> UserDb | None:
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
-            sql = "SELECT id, name, username, password FROM USER WHERE username = ?"
+            sql = "SELECT id, name, username, password, role FROM USER WHERE username = ?"
             cursor.execute(sql, (username,))
             result = cursor.fetchone()
             if result:
-                return UserDb(id=result[0], name=result[1], username=result[2], password=result[3])
-            return None            
+                return UserDb(id=result[0], name=result[1], username=result[2], password=result[3], role=result[4])
+            return None      
             
 def get_user_by_email(email: str) -> UserDb | None:
     # Asumimos que el email se guarda en el campo username
@@ -105,12 +114,11 @@ def get_all_students_db():
 
 def update_user_db(user_id: int, data: dict):
     new_name = data.get("name")
-    new_username = data.get("email") # Asumiendo que usamos email como username
 
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
             sql = "UPDATE USER SET name = ?, username = ? WHERE id = ?"
-            cursor.execute(sql, (new_name, new_username, user_id))
+            cursor.execute(sql, (new_name, user_id))
             conn.commit()
 
 def delete_user_db(user_id: int):
@@ -119,4 +127,66 @@ def delete_user_db(user_id: int):
             sql = "DELETE FROM USER WHERE id = ?"
             cursor.execute(sql, (user_id,))
             conn.commit()
-            
+
+def insert_attitude(teacher_id: int, student_id: int, description: str, tipo: str):
+    try:
+        # Usamos el 'with' que ya conoces, es lo más simple para manejar la conexión
+        with mariadb.connect(**db_config) as conn:
+            with conn.cursor() as cursor:
+                
+                # Crear la Actitud base (ATTITUDE)
+                # Ponemos 'Active' fijo porque tu tabla lo pide
+                sql1 = "INSERT INTO ATTITUDE (description, status) VALUES (?, 'Active')"
+                cursor.execute(sql1, (description,))
+                attitude_id = cursor.lastrowid # Guardamos el ID que se acaba de crear
+
+                # Vincular al Profesor (LOG_ATTITUDE)
+                sql2 = "INSERT INTO LOG_ATTITUDE (user_id, attitude_id) VALUES (?, ?)"
+                cursor.execute(sql2, (teacher_id, attitude_id))
+
+                # Depende de si es Amonestación o Reconocimiento
+                if tipo == "WARNING":
+                    # Insertar en tabla WARNING
+                    cursor.execute("INSERT INTO WARNING (attitude_id) VALUES (?)", (attitude_id,))
+                    # Vincular al Alumno (STUDENT_WARNING)
+                    cursor.execute("INSERT INTO STUDENT_WARNING (student_id, warning_id) VALUES (?, ?)", (student_id, attitude_id))
+                
+                elif tipo == "RECOGNITION":
+                    # Insertar en tabla RECOGNITION
+                    cursor.execute("INSERT INTO RECOGNITION (attitude_id) VALUES (?)", (attitude_id,))
+                    # Vincular al Alumno (STUDENT_RECOGNITION)
+                    cursor.execute("INSERT INTO STUDENT_RECOGNITION (student_id, recognition_id) VALUES (?, ?)", (student_id, attitude_id))
+
+                # Guardar cambios
+                conn.commit()
+                return True
+
+    except mariadb.Error as e:
+        print(f"Error base de datos: {e}")
+        return False
+    
+def insert_teacher_link(user_id: int):
+    try:
+        with mariadb.connect(**db_config) as conn:
+            with conn.cursor() as cursor:
+                # Asumimos que la tabla TEACHER tiene una columna user_id
+                sql = "INSERT INTO TEACHER (user_id) VALUES (?)"
+                cursor.execute(sql, (user_id,))
+                conn.commit()
+                return True
+    except mariadb.Error as e:
+        print(f"Error al vincular profesor: {e}")
+        return False
+    
+def insert_student(user_id: int):
+    try:
+        with mariadb.connect(**db_config) as conn:
+            with conn.cursor() as cursor:
+                # Asumimos que la tabla TEACHER tiene una columna user_id
+                sql = "INSERT INTO STUDENT (user_id) VALUES (?)"
+                cursor.execute(sql, (user_id,))
+                conn.commit()
+                return True
+    except mariadb.Error as e:
+        print(f"Error al vincular estudiante: {e}")
+        return False

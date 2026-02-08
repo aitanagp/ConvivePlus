@@ -1,160 +1,81 @@
-import token
-from app.auth.auth import (
-    create_access_token, 
-    Token, 
-    verify_password, 
-    oauth2_scheme, 
-    get_hash_password
+import json
+from fastapi import APIRouter, status, HTTPException, Depends, UploadFile, File
+from fastapi.security import OAuth2PasswordRequestForm
+from typing import List
+
+from app.models import (
+    UserCreateJson, UserOut, UserDb, Token
 )
-from app.models import UserIn, UserDb, UserOut, UserCreateJson, UserEditJson
 from app.database import (
     get_user_by_username, 
-    get_user_by_email,
-    get_user_by_id,
-    insert_user,
-    update_user_db, 
+    insert_user, 
     delete_user_db,
-    get_all_users_db
+    insert_teacher_link
 )
-
-from fastapi.security import OAuth2PasswordRequestForm
-from fastapi import APIRouter, status, HTTPException, Depends, Query
-
-router = APIRouter(
-    prefix="/v1/users",
-    tags=["Users"]
+from app.auth.auth import (
+    get_hash_password, 
+    verify_password, 
+    create_access_token
 )
+from app.dependencies import get_current_user, get_current_admin
 
-# --- SIGNUP ---
-@router.post("/signup/", status_code=status.HTTP_201_CREATED)
-async def create_user(userIn: UserIn):
-    # Verificar si existe
-    existing_user = get_user_by_username(userIn.username)
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="El nombre de usuario ya existe"
-        )
+router = APIRouter(prefix="/v1/users", tags=["Users"])
 
-    # HASHEAR la contraseña
-    hashed_password = get_hash_password(userIn.password)
-
-    # Insertar con la contraseña encriptada
-    insert_user(
-        UserDb(
-            name=userIn.name,
-            username=userIn.username,
-            password=hashed_password
-        )
-    )
-    return {"msg": "Usuario creado correctamente"}
-
-# --- LOGIN ---
-@router.post("/login/", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post("/login/", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    username = form_data.username
-    password = form_data.password
+    user = get_user_by_username(form_data.username)
+    if not user:
+        raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos")
     
-    user_db = get_user_by_username(username)
+    if not verify_password(form_data.password, user.password):
+        raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos")
     
-    if not user_db:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas"
-        )
-
-    if not verify_password(password, user_db.password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales incorrectas"
-        )
-        
-    access_token = create_access_token(
-        data={"sub": user_db.username} 
-    ) 
-        
+    access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
-# --- GET ALL ---
-@router.get("/all", response_model=list[UserOut]) 
-async def get_all_users(token: str = Depends(oauth2_scheme)):
-    # Llamamos a la base de datos real
-    users = get_all_users_db() 
-    
-    # Convertimos los resultados al modelo de salida (sin contraseñas)
-    return [
-        UserOut(id=u.id, name=u.name, username=u.username) for u in users
-    ]
-
-# --- FIND (Buscar por email - Admin) ---
-@router.get("/find", status_code=status.HTTP_200_OK)
-async def get_user_admin(
-    email: str = Query(...), 
-    token: str = Depends(oauth2_scheme)
+# IMPORTAR PROFESORES JSON
+@router.post("/import", status_code=status.HTTP_201_CREATED)
+async def import_teachers_from_json(
+    file: UploadFile = File(...),
+    admin_user: UserDb = Depends(get_current_admin)
 ):
-    user = get_user_by_email(email)
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return user
+    if not file.filename.endswith('.json'):
+        raise HTTPException(status_code=400, detail="El archivo debe ser un .json")
 
-# --- CREATE (Crear Admin manual) ---
-@router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_user_admin(
-    user_data: UserCreateJson, 
-    token: str = Depends(oauth2_scheme)
-):
-    existe = get_user_by_email(user_data.email)
-    if existe:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="El usuario ya existe"
+    content = await file.read()
+    try:
+        users_list = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="JSON mal formado")
+
+    created_count = 0
+    errors = []
+
+    for user_data in users_list:
+        email = user_data.get("email")
+        nombre = user_data.get("nombre")
+        contrasena = user_data.get("contrasena")
+
+        if not email or not nombre or not contrasena:
+            continue
+
+        if get_user_by_username(email):
+            errors.append(f"Usuario {email} ya existe")
+            continue 
+
+        hashed_pass = get_hash_password(contrasena)
+        new_teacher = UserDb(
+            username=email, name=nombre, password=hashed_pass, role="TEACHER"
         )
         
-    # HASHEAR PASSWORD AQUÍ TAMBIÉN
-    hashed_password = get_hash_password(user_data.contrasena)
-    
-    nuevo_usuario = UserDb(
-        id=user_data.id_usuario,
-        name=user_data.nombre,
-        username=user_data.email, 
-        password=hashed_password,
-        email=user_data.email
-    )
-    
-    insert_user(nuevo_usuario)
-    
-    # Devolvemos datos pero borramos la pass de la respuesta por seguridad
-    user_data.contrasena = "********"
-    return {"mensaje": "Usuario creado", "datos": user_data}
-
-# --- UPDATE ---
-@router.put("/", status_code=status.HTTP_200_OK)
-async def update_user_admin(
-    user_data: UserEditJson,
-    id: int = Query(...),
-    token: str = Depends(oauth2_scheme)
-):
-    usuario_actual = get_user_by_id(id)
-    if not usuario_actual:
-        raise HTTPException(status_code=404, detail="ID no encontrado")
+        # Guardamos en USER
+        user_id = insert_user(new_teacher)
         
-    datos_nuevos = {
-        "email": user_data.email,
-        "name": user_data.nombre
-    }
-    
-    update_user_db(id, datos_nuevos)
-    return {"mensaje": "Actualizado correctamente"}
+        if user_id != -1:
+            # guardamos en TECHAER
+            insert_teacher_link(user_id) 
+            created_count += 1
+        else:
+            errors.append(f"Error BD: {email}")
 
-# --- DELETE ---
-@router.delete("/", status_code=status.HTTP_200_OK)
-async def delete_user_admin(
-    id: int = Query(...),
-    token: str = Depends(oauth2_scheme)
-):
-    usuario = get_user_by_id(id)
-    if not usuario:
-        raise HTTPException(status_code=404, detail="Usuario no existe")
-        
-    delete_user_db(id)
-    return {"mensaje": "Usuario eliminado"}
+    return {"message": "Importación finalizada", "creados": created_count, "errores": errors}
