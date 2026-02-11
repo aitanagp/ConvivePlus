@@ -81,3 +81,14 @@ class CreateAttitude(BaseModel):
     student_email: str 
     type: str
     motive: str
+
+class AttitudeUpdate(BaseModel):
+    motive: str
+
+class AttitudeOut(BaseModel):
+    id: int
+    description: str
+    status: str
+    teacher_name: str | None = None
+    student_name: str | None = None
+    type: str | None = None # WARNING o RECOGNITION
