@@ -10,7 +10,10 @@ from app.database import (
     get_user_by_username, 
     insert_user, 
     delete_user_db,
-    insert_teacher_link
+    insert_teacher_link,
+    get_all_users_db,
+    get_user_by_id,
+    update_user_db
 )
 from app.auth.auth import (
     get_hash_password, 
@@ -79,3 +82,46 @@ async def import_teachers_from_json(
             errors.append(f"Error BD: {email}")
 
     return {"message": "Importación finalizada", "creados": created_count, "errores": errors}
+
+# LISTAR TODOS LOS USUARIOS
+@router.get("/", response_model=List[UserOut])
+async def get_users(admin_user: UserDb = Depends(get_current_admin)):
+    users = get_all_users_db()
+    return users
+
+# OBTENER UN USUARIO POR ID
+@router.get("/{user_id}", response_model=UserOut)
+async def get_user(user_id: int, current_user: UserDb = Depends(get_current_user)):
+    user = get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return user
+
+# ACTUALIZAR USUARIO
+from app.models import UserUpdate
+@router.put("/{user_id}", response_model=UserOut)
+async def update_user(
+    user_id: int, 
+    user_data: UserUpdate, 
+    admin_user: UserDb = Depends(get_current_admin)
+):
+    # Comprobar si existe
+    existing_user = get_user_by_id(user_id)
+    if not existing_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Actualizar en BD
+    update_user_db(user_id, user_data.dict())
+    
+    # Devolver el usuario actualizado
+    return get_user_by_id(user_id)
+
+# ELIMINAR USUARIO
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(user_id: int, admin_user: UserDb = Depends(get_current_admin)):
+    existing_user = get_user_by_id(user_id)
+    if not existing_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    delete_user_db(user_id)
+    return None

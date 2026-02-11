@@ -82,22 +82,22 @@ def get_user_by_email(email: str) -> UserDb | None:
 def get_user_by_id(user_id: int) -> UserDb | None:
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
-            sql = "SELECT id, name, username, password FROM USER WHERE id = ?"
+            sql = "SELECT id, name, username, password, role FROM USER WHERE id = ?"
             cursor.execute(sql, (user_id,))
             result = cursor.fetchone()
             if result:
-                return UserDb(id=result[0], name=result[1], username=result[2], password=result[3])
+                return UserDb(id=result[0], name=result[1], username=result[2], password=result[3], role=result[4])
             return None
 
 def get_all_users_db() -> list[UserDb]:
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
-            sql = "SELECT id, name, username, password FROM USER"
+            sql = "SELECT id, name, username, password, role FROM USER"
             cursor.execute(sql)
             results = cursor.fetchall()
             # Convertimos cada tupla en un objeto UserDb
             return [
-                UserDb(id=row[0], name=row[1], username=row[2], password=row[3])
+                UserDb(id=row[0], name=row[1], username=row[2], password=row[3], role=row[4])
                 for row in results
             ]
 
@@ -114,12 +114,15 @@ def get_all_students_db():
 
 def update_user_db(user_id: int, data: dict):
     new_name = data.get("name")
+    new_username = data.get("username")
+    new_role = data.get("role")
 
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
-            sql = "UPDATE USER SET name = ?, username = ? WHERE id = ?"
-            cursor.execute(sql, (new_name, user_id))
+            sql = "UPDATE USER SET name = ?, username = ?, role = ? WHERE id = ?"
+            cursor.execute(sql, (new_name, new_username, new_role, user_id))
             conn.commit()
+            return True
 
 def delete_user_db(user_id: int):
     with mariadb.connect(**db_config) as conn:

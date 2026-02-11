@@ -44,6 +44,11 @@ class UserEditProfile(BaseModel):
     name: str | None = None
     email: str | None = None
 
+class UserUpdate(BaseModel):
+    name: str
+    username: str
+    role: str
+
 # MODELOS DE ALUMNOS
 class StudentBase(BaseModel):
     name: str
