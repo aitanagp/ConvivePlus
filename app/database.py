@@ -133,17 +133,14 @@ def delete_user_db(user_id: int):
 
 def insert_attitude(teacher_id: int, student_id: int, description: str, tipo: str):
     try:
-        # Usamos el 'with' que ya conoces, es lo más simple para manejar la conexión
         with mariadb.connect(**db_config) as conn:
             with conn.cursor() as cursor:
                 
                 # Crear la Actitud base (ATTITUDE)
-                # Ponemos 'Active' fijo porque tu tabla lo pide
                 sql1 = "INSERT INTO ATTITUDE (description, status) VALUES (?, 'Active')"
                 cursor.execute(sql1, (description,))
                 attitude_id = cursor.lastrowid # Guardamos el ID que se acaba de crear
 
-                # Vincular al Profesor (LOG_ATTITUDE)
                 sql2 = "INSERT INTO LOG_ATTITUDE (user_id, attitude_id) VALUES (?, ?)"
                 cursor.execute(sql2, (teacher_id, attitude_id))
 
@@ -172,7 +169,6 @@ def insert_teacher_link(user_id: int):
     try:
         with mariadb.connect(**db_config) as conn:
             with conn.cursor() as cursor:
-                # Asumimos que la tabla TEACHER tiene una columna user_id
                 sql = "INSERT INTO TEACHER (user_id) VALUES (?)"
                 cursor.execute(sql, (user_id,))
                 conn.commit()
@@ -185,7 +181,6 @@ def insert_student(user_id: int):
     try:
         with mariadb.connect(**db_config) as conn:
             with conn.cursor() as cursor:
-                # Asumimos que la tabla TEACHER tiene una columna user_id
                 sql = "INSERT INTO STUDENT (user_id) VALUES (?)"
                 cursor.execute(sql, (user_id,))
                 conn.commit()
@@ -193,3 +188,52 @@ def insert_student(user_id: int):
     except mariadb.Error as e:
         print(f"Error al vincular estudiante: {e}")
         return False
+
+# FUNCIONES PARA ACTITUDES
+
+def get_attitudes_db(teacher_id=None):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT a.id, a.description, a.status, u.name as teacher_name, la.user_id
+                FROM ATTITUDE a
+                JOIN LOG_ATTITUDE la ON a.id = la.attitude_id
+                JOIN USER u ON la.user_id = u.id
+            """
+            if teacher_id:
+                sql += " WHERE la.user_id = ?"
+                cursor.execute(sql, (teacher_id,))
+            else:
+                cursor.execute(sql)
+            
+            rows = cursor.fetchall()
+            return [
+                {"id": r[0], "description": r[1], "status": r[2], "teacher_name": r[3], "teacher_id": r[4]}
+                for r in rows
+            ]
+
+def get_attitude_owner_id(attitude_id):
+    """Para saber quién creó la actitud y si puede borrarla/editarla"""
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = "SELECT user_id FROM LOG_ATTITUDE WHERE attitude_id = ?"
+            cursor.execute(sql, (attitude_id,))
+            result = cursor.fetchone()
+            return result[0] if result else None
+
+def update_attitude_db(attitude_id, description):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = "UPDATE ATTITUDE SET description = ? WHERE id = ?"
+            cursor.execute(sql, (description, attitude_id))
+            conn.commit()
+            return True
+
+def delete_attitude_db(attitude_id):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            # Primero borramos de las tablas relacionadas
+            sql = "DELETE FROM ATTITUDE WHERE id = ?"
+            cursor.execute(sql, (attitude_id,))
+            conn.commit()
+            return True
