@@ -1,4 +1,4 @@
-from app.models import StudentDb, UserDb
+from app.models import StudentDb, UserDb, StudentUpdate
 import mariadb
 import sys
 
@@ -237,3 +237,64 @@ def delete_attitude_db(attitude_id):
             cursor.execute(sql, (attitude_id,))
             conn.commit()
             return True
+
+# FUNCIONES PARA ALUMNOS
+
+def get_student_by_id_db(student_id: int):
+    # Busco al alumno por su ID
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = "SELECT id, name, surname, email, age, student_group FROM STUDENT WHERE id = ?"
+            cursor.execute(sql, (student_id,))
+            r = cursor.fetchone()
+            if r:
+                return {"id": r[0], "name": r[1], "surname": r[2], "email": r[3], "age": r[4], "student_group": r[5]}
+            return None
+
+def update_student_db(student_id: int, student_data: StudentUpdate):
+    # Esto es para cambiar los datos del alumno
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            # Primero traigo lo que hay ahora por si acaso
+            current = get_student_by_id_db(student_id)
+            if not current:
+                return False
+            
+            # Si el dato es None, me quedo con el que ya había
+            name = student_data.name if student_data.name is not None else current["name"]
+            surname = student_data.surname if student_data.surname is not None else current["surname"]
+            email = student_data.email if student_data.email is not None else current["email"]
+            age = student_data.age if student_data.age is not None else current["age"]
+            student_group = student_data.student_group if student_data.student_group is not None else current["student_group"]
+
+            sql = "UPDATE STUDENT SET name = ?, surname = ?, email = ?, age = ?, student_group = ? WHERE id = ?"
+            cursor.execute(sql, (name, surname, email, age, student_group, student_id))
+            conn.commit()
+            return True
+
+def delete_student_db(student_id: int):
+    # Hay que borrar las actitudes para que no se queden huérfanas
+    try:
+        with mariadb.connect(**db_config) as conn:
+            with conn.cursor() as cursor:
+                # Busco todas las actitudes de este alumno (amonestaciones y reconocimientos)
+                sql_get_attitudes = """
+                    SELECT warning_id FROM STUDENT_WARNING WHERE student_id = ?
+                    UNION
+                    SELECT recognition_id FROM STUDENT_RECOGNITION WHERE student_id = ?
+                """
+                cursor.execute(sql_get_attitudes, (student_id, student_id))
+                attitude_ids = [row[0] for row in cursor.fetchall()]
+
+                # Borro cada actitud de la tabla gorda ATTITUDE
+                for aid in attitude_ids:
+                    cursor.execute("DELETE FROM ATTITUDE WHERE id = ?", (aid,))
+                
+                # borro al alumno
+                cursor.execute("DELETE FROM STUDENT WHERE id = ?", (student_id,))
+                
+                conn.commit()
+                return True
+    except mariadb.Error as e:
+        print(f"Error borrando alumno: {e}")
+        return False

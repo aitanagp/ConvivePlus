@@ -76,6 +76,13 @@ class StudentImportJson(BaseModel):
     age: int
     student_group: str
 
+class StudentUpdate(BaseModel): # Este es para cuando editamos un alumno
+    name: str | None = None
+    surname: str | None = None
+    email: str | None = None
+    age: int | None = None
+    student_group: str | None = None
+
 # MODELOS DE ACTITUDES
 class CreateAttitude(BaseModel):
     student_email: str 
