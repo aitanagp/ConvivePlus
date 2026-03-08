@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import date, time
 
 class Token(BaseModel):
     access_token: str
@@ -99,3 +100,20 @@ class AttitudeOut(BaseModel):
     teacher_name: str | None = None
     student_name: str | None = None
     type: str | None = None # WARNING o RECOGNITION
+
+# MODELOS DE AULA DE CONVIVENCIA
+class ClassroomAssignmentIn(BaseModel):
+    student_id: int
+    start_date: date
+    end_date: date
+    start_time: time
+    end_time: time
+
+class ClassroomTaskIn(BaseModel):
+    assignment_id: int
+    description: str
+
+class AttendanceUpdate(BaseModel):
+    assignment_id: int
+    attendance_date: date
+    status: str # PRESENTE o AUSENTE

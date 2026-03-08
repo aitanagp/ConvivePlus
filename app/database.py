@@ -1,4 +1,4 @@
-from app.models import StudentDb, UserDb, StudentUpdate
+from app.models import StudentDb, UserDb, StudentUpdate, ClassroomAssignmentIn, ClassroomTaskIn, AttendanceUpdate
 import mariadb
 import sys
 
@@ -298,3 +298,105 @@ def delete_student_db(student_id: int):
     except mariadb.Error as e:
         print(f"Error borrando alumno: {e}")
         return False
+
+# FUNCIONES PARA EL AULA DE CONVIVENCIA
+
+def check_classroom_overlap(student_id: int, start_date, end_date, start_time, end_time):
+    # Miro si el alumno ya tiene algo a esa misma hora y fecha
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT id FROM CLASSROOM_ASSIGNMENT
+                WHERE student_id = ?
+                AND (start_date <= ? AND end_date >= ?)
+                AND (start_time < ? AND end_time > ?)
+            """
+            cursor.execute(sql, (student_id, end_date, start_date, end_time, start_time))
+            return cursor.fetchone() is not None
+
+def insert_classroom_assignment(assignment: ClassroomAssignmentIn, teacher_id: int):
+    # Primero miro si se pisa con otro horario
+    if check_classroom_overlap(assignment.student_id, assignment.start_date, assignment.end_date, assignment.start_time, assignment.end_time):
+        return None
+    
+    try:
+        with mariadb.connect(**db_config) as conn:
+            with conn.cursor() as cursor:
+                sql = """
+                    INSERT INTO CLASSROOM_ASSIGNMENT 
+                    (student_id, teacher_id, start_date, end_date, start_time, end_time)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """
+                cursor.execute(sql, (assignment.student_id, teacher_id, assignment.start_date, assignment.end_date, assignment.start_time, assignment.end_time))
+                conn.commit()
+                return cursor.lastrowid
+    except mariadb.Error as e:
+        print(f"Error al asignar aula: {e}")
+        return None
+
+def get_daily_classroom_students(today, time_filter=None):
+    # Saco los alumnos que tienen que estar hoy en el aula
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT ca.id, s.name, s.surname, ca.start_time, ca.end_time
+                FROM CLASSROOM_ASSIGNMENT ca
+                JOIN STUDENT s ON ca.student_id = s.id
+                WHERE ca.start_date <= ? AND ca.end_date >= ?
+            """
+            params = [today, today]
+            if time_filter:
+                sql += " AND ca.start_time <= ? AND ca.end_time >= ?"
+                params.extend([time_filter, time_filter])
+            
+            cursor.execute(sql, tuple(params))
+            rows = cursor.fetchall()
+            return [
+                {"assignment_id": r[0], "name": r[1], "surname": r[2], "start_time": str(r[3]), "end_time": str(r[4])}
+                for r in rows
+            ]
+
+def insert_classroom_task(task: ClassroomTaskIn):
+    # Poner una tarea al alumno
+    try:
+        with mariadb.connect(**db_config) as conn:
+            with conn.cursor() as cursor:
+                sql = "INSERT INTO CLASSROOM_TASK (assignment_id, description) VALUES (?, ?)"
+                cursor.execute(sql, (task.assignment_id, task.description))
+                conn.commit()
+                return cursor.lastrowid
+    except mariadb.Error as e:
+        print(f"Error al crear tarea: {e}")
+        return None
+
+def update_classroom_attendance(attendance: AttendanceUpdate):
+    # Pasar lista
+    try:
+        with mariadb.connect(**db_config) as conn:
+            with conn.cursor() as cursor:
+                # Miro si ya existe la fila de asistencia para ese día
+                sql_check = "SELECT id FROM CLASSROOM_ATTENDANCE WHERE assignment_id = ? AND attendance_date = ?"
+                cursor.execute(sql_check, (attendance.assignment_id, attendance.attendance_date))
+                res = cursor.fetchone()
+                
+                if res:
+                    sql = "UPDATE CLASSROOM_ATTENDANCE SET status = ? WHERE id = ?"
+                    cursor.execute(sql, (attendance.status, res[0]))
+                else:
+                    sql = "INSERT INTO CLASSROOM_ATTENDANCE (assignment_id, attendance_date, status) VALUES (?, ?, ?)"
+                    cursor.execute(sql, (attendance.assignment_id, attendance.attendance_date, attendance.status))
+                
+                conn.commit()
+                return True
+    except mariadb.Error as e:
+        print(f"Error en asistencia: {e}")
+        return False
+
+def get_student_tasks_report(assignment_id: int):
+    # Saco las tareas para el reporte
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = "SELECT description, status FROM CLASSROOM_TASK WHERE assignment_id = ?"
+            cursor.execute(sql, (assignment_id,))
+            rows = cursor.fetchall()
+            return [{"task": r[0], "status": r[1]} for r in rows]
