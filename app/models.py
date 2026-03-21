@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from datetime import date, time
+from typing import List
 
 class Token(BaseModel):
     access_token: str
@@ -117,3 +118,20 @@ class AttendanceUpdate(BaseModel):
     assignment_id: int
     attendance_date: date
     status: str # PRESENTE o AUSENTE
+
+# MODELOS DE EXPEDIENTES DISCIPLINARIOS
+class DisciplinaryRecordOpen(BaseModel):
+    student_id: int
+    attitude_ids: List[int]
+    observations: str | None = ""
+
+class DisciplinaryRecordStatusUpdate(BaseModel):
+    status: str # Abierto, En trámite, Cerrado, Sancionado
+    observations: str | None = None
+
+class DisciplinaryRecordOut(BaseModel):
+    id: int
+    student_id: int
+    start_date: date
+    status: str
+    observations: str

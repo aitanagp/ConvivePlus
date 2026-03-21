@@ -1,6 +1,11 @@
-from app.models import StudentDb, UserDb, StudentUpdate, ClassroomAssignmentIn, ClassroomTaskIn, AttendanceUpdate
+from app.models import (
+    StudentDb, UserDb, StudentUpdate, 
+    ClassroomAssignmentIn, ClassroomTaskIn, AttendanceUpdate,
+    DisciplinaryRecordOpen, DisciplinaryRecordStatusUpdate
+)
 import mariadb
 import sys
+from datetime import date
 
 # Configuración de la DB
 db_config = {
@@ -400,3 +405,75 @@ def get_student_tasks_report(assignment_id: int):
             cursor.execute(sql, (assignment_id,))
             rows = cursor.fetchall()
             return [{"task": r[0], "status": r[1]} for r in rows]
+
+# --- FUNCIONES PARA EXPEDIENTES DISCIPLINARIOS ---
+
+def open_disciplinary_record_db(record_in: DisciplinaryRecordOpen):
+    # 1. Mirar si todas las actitudes son WARNING
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            for aid in record_in.attitude_ids:
+                cursor.execute("SELECT attitude_id FROM WARNING WHERE attitude_id = ?", (aid,))
+                if not cursor.fetchone():
+                    # Si alguna no es amonestación, no dejo abrir el expediente
+                    return None
+            
+            # 2. Crear el expediente
+            today = date.today()
+            sql_record = "INSERT INTO DISCIPLINARY_RECORD (student_id, start_date, observations) VALUES (?, ?, ?)"
+            cursor.execute(sql_record, (record_in.student_id, today, record_in.observations))
+            record_id = cursor.lastrowid
+            
+            # 3. Vincular las actitudes
+            for aid in record_in.attitude_ids:
+                cursor.execute("INSERT INTO RECORD_ATTITUDE (record_id, attitude_id) VALUES (?, ?)", (record_id, aid))
+            
+            conn.commit()
+            return record_id
+
+def get_student_records_db(student_id: int):
+    # Historial de un alumno
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = "SELECT id, start_date, status, observations FROM DISCIPLINARY_RECORD WHERE student_id = ?"
+            cursor.execute(sql, (student_id,))
+            rows = cursor.fetchall()
+            return [
+                {"id": r[0], "start_date": str(r[1]), "status": r[2], "observations": r[3]}
+                for r in rows
+            ]
+
+def update_record_status_db(record_id: int, update_data: DisciplinaryRecordStatusUpdate):
+    # Cambiar el estado u observaciones
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            # Traigo lo que hay para no machacar si me pasan nulo
+            cursor.execute("SELECT status, observations FROM DISCIPLINARY_RECORD WHERE id = ?", (record_id,))
+            current = cursor.fetchone()
+            if not current:
+                return False
+            
+            new_status = update_data.status if update_data.status else current[0]
+            new_obs = update_data.observations if update_data.observations is not None else current[1]
+            
+            sql = "UPDATE DISCIPLINARY_RECORD SET status = ?, observations = ? WHERE id = ?"
+            cursor.execute(sql, (new_status, new_obs, record_id))
+            conn.commit()
+            return True
+
+def get_pending_records_db():
+    # Los que no estén cerrados
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT dr.id, s.name, s.surname, dr.start_date, dr.status
+                FROM DISCIPLINARY_RECORD dr
+                JOIN STUDENT s ON dr.student_id = s.id
+                WHERE dr.status != 'Cerrado'
+            """
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            return [
+                {"id": r[0], "student_name": f"{r[1]} {r[2]}", "start_date": str(r[3]), "status": r[4]}
+                for r in rows
+            ]
