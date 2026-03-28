@@ -406,10 +406,10 @@ def get_student_tasks_report(assignment_id: int):
             rows = cursor.fetchall()
             return [{"task": r[0], "status": r[1]} for r in rows]
 
-# --- FUNCIONES PARA EXPEDIENTES DISCIPLINARIOS ---
+# FUNCIONES PARA EXPEDIENTES DISCIPLINARIOS
 
 def open_disciplinary_record_db(record_in: DisciplinaryRecordOpen):
-    # 1. Mirar si todas las actitudes son WARNING
+    # Mirar si todas las actitudes son WARNING
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
             for aid in record_in.attitude_ids:
@@ -418,13 +418,13 @@ def open_disciplinary_record_db(record_in: DisciplinaryRecordOpen):
                     # Si alguna no es amonestación, no dejo abrir el expediente
                     return None
             
-            # 2. Crear el expediente
+            # Crear el expediente
             today = date.today()
             sql_record = "INSERT INTO DISCIPLINARY_RECORD (student_id, start_date, observations) VALUES (?, ?, ?)"
             cursor.execute(sql_record, (record_in.student_id, today, record_in.observations))
             record_id = cursor.lastrowid
             
-            # 3. Vincular las actitudes
+            # Vincular las actitudes
             for aid in record_in.attitude_ids:
                 cursor.execute("INSERT INTO RECORD_ATTITUDE (record_id, attitude_id) VALUES (?, ?)", (record_id, aid))
             
@@ -447,7 +447,6 @@ def update_record_status_db(record_id: int, update_data: DisciplinaryRecordStatu
     # Cambiar el estado u observaciones
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
-            # Traigo lo que hay para no machacar si me pasan nulo
             cursor.execute("SELECT status, observations FROM DISCIPLINARY_RECORD WHERE id = ?", (record_id,))
             current = cursor.fetchone()
             if not current:
