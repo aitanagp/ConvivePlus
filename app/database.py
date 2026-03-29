@@ -1,7 +1,8 @@
 from app.models import (
     StudentDb, UserDb, StudentUpdate, 
     ClassroomAssignmentIn, ClassroomTaskIn, AttendanceUpdate,
-    DisciplinaryRecordOpen, DisciplinaryRecordStatusUpdate
+    DisciplinaryRecordOpen, DisciplinaryRecordStatusUpdate,
+    AcademicYearIn
 )
 import mariadb
 import sys
@@ -406,10 +407,10 @@ def get_student_tasks_report(assignment_id: int):
             rows = cursor.fetchall()
             return [{"task": r[0], "status": r[1]} for r in rows]
 
-# FUNCIONES PARA EXPEDIENTES DISCIPLINARIOS
+# --- FUNCIONES PARA EXPEDIENTES DISCIPLINARIOS ---
 
 def open_disciplinary_record_db(record_in: DisciplinaryRecordOpen):
-    # Mirar si todas las actitudes son WARNING
+    # 1. Mirar si todas las actitudes son WARNING
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
             for aid in record_in.attitude_ids:
@@ -418,13 +419,13 @@ def open_disciplinary_record_db(record_in: DisciplinaryRecordOpen):
                     # Si alguna no es amonestación, no dejo abrir el expediente
                     return None
             
-            # Crear el expediente
+            # 2. Crear el expediente
             today = date.today()
             sql_record = "INSERT INTO DISCIPLINARY_RECORD (student_id, start_date, observations) VALUES (?, ?, ?)"
             cursor.execute(sql_record, (record_in.student_id, today, record_in.observations))
             record_id = cursor.lastrowid
             
-            # Vincular las actitudes
+            # 3. Vincular las actitudes
             for aid in record_in.attitude_ids:
                 cursor.execute("INSERT INTO RECORD_ATTITUDE (record_id, attitude_id) VALUES (?, ?)", (record_id, aid))
             
@@ -447,6 +448,7 @@ def update_record_status_db(record_id: int, update_data: DisciplinaryRecordStatu
     # Cambiar el estado u observaciones
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
+            # Traigo lo que hay para no machacar si me pasan nulo
             cursor.execute("SELECT status, observations FROM DISCIPLINARY_RECORD WHERE id = ?", (record_id,))
             current = cursor.fetchone()
             if not current:
@@ -476,3 +478,47 @@ def get_pending_records_db():
                 {"id": r[0], "student_name": f"{r[1]} {r[2]}", "start_date": str(r[3]), "status": r[4]}
                 for r in rows
             ]
+
+# FUNCIONES PARA CURSOS ACADÉMICOS
+
+def insert_academic_year_db(year: AcademicYearIn):
+    try:
+        with mariadb.connect(**db_config) as conn:
+            with conn.cursor() as cursor:
+                sql = "INSERT INTO ACADEMIC_YEAR (start_year, end_year) VALUES (?, ?)"
+                cursor.execute(sql, (year.start_year, year.end_year))
+                conn.commit()
+                return cursor.lastrowid
+    except mariadb.Error as e:
+        print(f"Error al crear curso: {e}")
+        return None
+
+def get_academic_years_db():
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = "SELECT id, start_year, end_year, is_active FROM ACADEMIC_YEAR"
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            return [
+                {"id": r[0], "start_year": r[1], "end_year": r[2], "is_active": bool(r[3])}
+                for r in rows
+            ]
+
+def set_current_academic_year_db(year_id: int):
+    try:
+        with mariadb.connect(**db_config) as conn:
+            with conn.cursor() as cursor:
+                # 1. Desactivar todos
+                cursor.execute("UPDATE ACADEMIC_YEAR SET is_active = FALSE")
+                # 2. Activar el seleccionado
+                cursor.execute("UPDATE ACADEMIC_YEAR SET is_active = TRUE WHERE id = ?", (year_id,))
+                
+                if cursor.rowcount == 0:
+                    conn.rollback()
+                    return False
+                
+                conn.commit()
+                return True
+    except mariadb.Error as e:
+        print(f"Error al activar curso: {e}")
+        return False

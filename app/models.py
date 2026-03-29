@@ -135,3 +135,12 @@ class DisciplinaryRecordOut(BaseModel):
     start_date: date
     status: str
     observations: str
+
+# MODELOS DE CURSO ACADÉMICO
+class AcademicYearIn(BaseModel):
+    start_year: int
+    end_year: int
+
+class AcademicYearOut(AcademicYearIn):
+    id: int
+    is_active: bool
