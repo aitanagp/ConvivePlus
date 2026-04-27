@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import date, time
-from typing import List
+from typing import List, Dict
 
 class Token(BaseModel):
     access_token: str
@@ -144,3 +144,21 @@ class AcademicYearIn(BaseModel):
 class AcademicYearOut(AcademicYearIn):
     id: int
     is_active: bool
+
+# --- MODELOS DE ESTADÍSTICAS ---
+class StatsSummary(BaseModel):
+    warnings: int
+    recognitions: int
+    total: int
+
+class GroupStats(BaseModel):
+    student_group: str
+    warnings: int
+    recognitions: int
+
+class TopStudentStats(BaseModel):
+    student_id: int
+    name: str
+    surname: str
+    student_group: str
+    count: int

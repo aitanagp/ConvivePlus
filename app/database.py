@@ -143,8 +143,9 @@ def insert_attitude(teacher_id: int, student_id: int, description: str, tipo: st
             with conn.cursor() as cursor:
                 
                 # Crear la Actitud base (ATTITUDE)
-                sql1 = "INSERT INTO ATTITUDE (description, status) VALUES (?, 'Active')"
-                cursor.execute(sql1, (description,))
+                # Ahora incluimos la fecha (created_at) aunque tenga default, por seguridad
+                sql1 = "INSERT INTO ATTITUDE (description, status, created_at) VALUES (?, 'Active', ?)"
+                cursor.execute(sql1, (description, date.today()))
                 attitude_id = cursor.lastrowid # Guardamos el ID que se acaba de crear
 
                 sql2 = "INSERT INTO LOG_ATTITUDE (user_id, attitude_id) VALUES (?, ?)"
@@ -479,7 +480,7 @@ def get_pending_records_db():
                 for r in rows
             ]
 
-# FUNCIONES PARA CURSOS ACADÉMICOS
+# --- FUNCIONES PARA CURSOS ACADÉMICOS ---
 
 def insert_academic_year_db(year: AcademicYearIn):
     try:
@@ -522,3 +523,111 @@ def set_current_academic_year_db(year_id: int):
     except mariadb.Error as e:
         print(f"Error al activar curso: {e}")
         return False
+
+# --- FUNCIONES PARA ESTADÍSTICAS ---
+
+def get_stats_summary_db(start_date=None, end_date=None):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql_warnings = "SELECT COUNT(*) FROM WARNING w JOIN ATTITUDE a ON w.attitude_id = a.id"
+            sql_recognitions = "SELECT COUNT(*) FROM RECOGNITION r JOIN ATTITUDE a ON r.attitude_id = a.id"
+            
+            params = []
+            where_clauses = []
+            if start_date:
+                where_clauses.append("a.created_at >= ?")
+                params.append(start_date)
+            if end_date:
+                where_clauses.append("a.created_at <= ?")
+                params.append(end_date)
+            
+            if not start_date and not end_date:
+                cursor.execute("SELECT start_year, end_year FROM ACADEMIC_YEAR WHERE is_active = TRUE")
+                active_year = cursor.fetchone()
+                if active_year:
+                    where_clauses.append("a.created_at BETWEEN ? AND ?")
+                    params.extend([f"{active_year[0]}-09-01", f"{active_year[1]}-08-31"])
+            
+            if where_clauses:
+                where_str = " WHERE " + " AND ".join(where_clauses)
+                sql_warnings += where_str
+                sql_recognitions += where_str
+            
+            cursor.execute(sql_warnings, tuple(params))
+            w_count = cursor.fetchone()[0]
+            
+            cursor.execute(sql_recognitions, tuple(params))
+            r_count = cursor.fetchone()[0]
+            
+            return {"warnings": w_count, "recognitions": r_count, "total": w_count + r_count}
+
+def get_stats_by_group_db(start_date=None, end_date=None):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT student_group, 
+                       SUM(CASE WHEN tipo = 'WARNING' THEN 1 ELSE 0 END) as warnings,
+                       SUM(CASE WHEN tipo = 'RECOGNITION' THEN 1 ELSE 0 END) as recognitions
+                FROM (
+                    SELECT s.student_group, 'WARNING' as tipo, a.created_at
+                    FROM STUDENT s
+                    JOIN STUDENT_WARNING sw ON s.id = sw.student_id
+                    JOIN ATTITUDE a ON sw.warning_id = a.id
+                    UNION ALL
+                    SELECT s.student_group, 'RECOGNITION' as tipo, a.created_at
+                    FROM STUDENT s
+                    JOIN STUDENT_RECOGNITION sr ON s.id = sr.student_id
+                    JOIN ATTITUDE a ON sr.recognition_id = a.id
+                ) t
+            """
+            params = []
+            where_clauses = []
+            if start_date:
+                where_clauses.append("created_at >= ?")
+                params.append(start_date)
+            if end_date:
+                where_clauses.append("created_at <= ?")
+                params.append(end_date)
+            
+            if where_clauses:
+                sql += " WHERE " + " AND ".join(where_clauses)
+            
+            sql += " GROUP BY student_group"
+            
+            cursor.execute(sql, tuple(params))
+            rows = cursor.fetchall()
+            return [
+                {"student_group": r[0], "warnings": int(r[1]), "recognitions": int(r[2])}
+                for r in rows
+            ]
+
+def get_top_students_stats_db(start_date=None, end_date=None, limit=10):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT s.id, s.name, s.surname, s.student_group, COUNT(sw.warning_id) as count
+                FROM STUDENT s
+                JOIN STUDENT_WARNING sw ON s.id = sw.student_id
+                JOIN ATTITUDE a ON sw.warning_id = a.id
+            """
+            params = []
+            where_clauses = []
+            if start_date:
+                where_clauses.append("a.created_at >= ?")
+                params.append(start_date)
+            if end_date:
+                where_clauses.append("a.created_at <= ?")
+                params.append(end_date)
+            
+            if where_clauses:
+                sql += " WHERE " + " AND ".join(where_clauses)
+            
+            sql += " GROUP BY s.id ORDER BY count DESC LIMIT ?"
+            params.append(limit)
+            
+            cursor.execute(sql, tuple(params))
+            rows = cursor.fetchall()
+            return [
+                {"student_id": r[0], "name": r[1], "surname": r[2], "student_group": r[3], "count": r[4]}
+                for r in rows
+            ]
