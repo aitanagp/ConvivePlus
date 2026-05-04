@@ -67,6 +67,7 @@ class StudentDb(StudentBase): # Hereda de StudentBase para tener todos los campo
 
 class StudentOut(StudentBase):
     id: int
+    is_probi: bool = False
 
 class StudentLoginIn(StudentBase):
     pass

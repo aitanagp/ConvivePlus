@@ -110,11 +110,15 @@ def get_all_users_db() -> list[UserDb]:
 def get_all_students_db():
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
-            sql = "SELECT id, name, surname, email, age, student_group FROM STUDENT"
+            sql = """
+                SELECT s.id, s.name, s.surname, s.email, s.age, s.student_group, 
+                       (SELECT COUNT(*) FROM PROBI_RECOGNITION WHERE student_id = s.id AND status = 'APPROVED') > 0 as is_probi
+                FROM STUDENT s
+            """
             cursor.execute(sql)
             result = cursor.fetchall()
             return [
-                {"id": r[0], "name": r[1], "surname": r[2], "email": r[3], "age": r[4], "student_group": r[5]}
+                {"id": r[0], "name": r[1], "surname": r[2], "email": r[3], "age": r[4], "student_group": r[5], "is_probi": bool(r[6])}
                 for r in result
                 ]
 
@@ -255,7 +259,9 @@ def get_student_by_id_db(student_id: int):
             cursor.execute(sql, (student_id,))
             r = cursor.fetchone()
             if r:
-                return {"id": r[0], "name": r[1], "surname": r[2], "email": r[3], "age": r[4], "student_group": r[5]}
+                cursor.execute("SELECT id FROM PROBI_RECOGNITION WHERE student_id = ? AND status = 'APPROVED'", (student_id,))
+                is_probi = cursor.fetchone() is not None
+                return {"id": r[0], "name": r[1], "surname": r[2], "email": r[3], "age": r[4], "student_group": r[5], "is_probi": is_probi}
             return None
 
 def update_student_db(student_id: int, student_data: StudentUpdate):
@@ -631,3 +637,71 @@ def get_top_students_stats_db(start_date=None, end_date=None, limit=10):
                 {"student_id": r[0], "name": r[1], "surname": r[2], "student_group": r[3], "count": r[4]}
                 for r in rows
             ]
+# --- FUNCIONES PROBI ---
+
+def init_probi_table():
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+            CREATE TABLE IF NOT EXISTS PROBI_RECOGNITION (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                student_id INT NOT NULL,
+                teacher_id INT NOT NULL,
+                justification TEXT, status VARCHAR(20) DEFAULT 'PENDING',
+                created_at DATE NOT NULL,
+                FOREIGN KEY (student_id) REFERENCES STUDENT(id) ON DELETE CASCADE,
+                FOREIGN KEY (teacher_id) REFERENCES USER(id) ON DELETE CASCADE
+            )
+            """
+            cursor.execute(sql)
+            conn.commit()
+
+def insert_probi_nomination(student_id: int, teacher_id: int, justification: str):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = "INSERT INTO PROBI_RECOGNITION (student_id, teacher_id, justification, created_at) VALUES (?, ?, ?, ?)"
+            cursor.execute(sql, (student_id, teacher_id, justification, date.today()))
+            conn.commit()
+            return cursor.lastrowid
+
+def get_probi_hall_of_fame():
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT p.id, s.name, s.surname, u.name as teacher_name, p.justification, p.created_at
+                FROM PROBI_RECOGNITION p
+                JOIN STUDENT s ON p.student_id = s.id
+                JOIN USER u ON p.teacher_id = u.id
+            """
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            return [
+                {"id": r[0], "student_name": f"{r[1]} {r[2]}", "teacher_name": r[3], "justification": r[4], "created_at": str(r[5])}
+                for r in rows
+            ]
+
+def get_probi_suggestions():
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT s.id, s.name, s.surname, COUNT(sr.recognition_id) as rec_count
+                FROM STUDENT s
+                JOIN STUDENT_RECOGNITION sr ON s.id = sr.student_id
+                WHERE s.id NOT IN (SELECT student_id FROM STUDENT_WARNING)
+                GROUP BY s.id
+                HAVING rec_count >= 1
+                ORDER BY rec_count DESC
+            """
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            return [
+                {"student_id": r[0], "name": r[1], "surname": r[2], "recognitions": r[3]}
+                for r in rows
+            ]
+
+def delete_probi_recognition(probi_id: int):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM PROBI_RECOGNITION WHERE id = ?", (probi_id,))
+            conn.commit()
+            return cursor.rowcount > 0
