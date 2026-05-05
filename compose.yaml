@@ -23,6 +23,8 @@ services:
       - myapi_network
     volumes:
       - ./myapidb_data:/data/db
+      - ./docs/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./mysql_data:/var/lib/mysql
 
   myapiadminer:
     image: adminer
