@@ -188,7 +188,7 @@ def insert_teacher_link(user_id: int):
         print(f"Error al vincular profesor: {e}")
         return False
     
-def insert_student(user_id: int):
+def insert_student_link(user_id: int):
     try:
         with mariadb.connect(**db_config) as conn:
             with conn.cursor() as cursor:
