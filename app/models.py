@@ -30,6 +30,12 @@ class UserLoginIn(UserBase):
     pass
 
 # MODELOS JSON
+class UserCreate(BaseModel):
+    username: str
+    name: str
+    password: str
+    role: str = "TEACHER"
+
 class UserCreateJson(BaseModel):
     email: str
     nombre: str

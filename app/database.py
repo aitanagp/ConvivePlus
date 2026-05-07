@@ -22,8 +22,8 @@ def insert_user(user: UserDb) -> int:
     try:
         with mariadb.connect(**db_config) as conn:
             with conn.cursor() as cursor:
-                sql = "INSERT INTO USER (username, name, password) VALUES (?, ?, ?)"
-                values = (user.username, user.name, user.password)
+                sql = "INSERT INTO USER (username, name, password, role) VALUES (?, ?, ?, ?)"
+                values = (user.username, user.name, user.password, user.role)
                 cursor.execute(sql, values)
                 conn.commit()
                 return cursor.lastrowid

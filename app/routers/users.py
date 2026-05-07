@@ -35,6 +35,35 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     
     access_token = create_access_token(data={"sub": user.username, "role": user.role})
     return {"access_token": access_token, "token_type": "bearer"}
+    
+# CREAR USUARIO (INDIVIDUAL)
+from app.models import UserCreate
+@router.post("/", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+async def create_user(
+    user_in: UserCreate, 
+    admin_user: UserDb = Depends(get_current_admin)
+):
+    # Comprobar si ya existe
+    if get_user_by_username(user_in.username):
+        raise HTTPException(status_code=400, detail="El usuario ya existe")
+    
+    hashed_pass = get_hash_password(user_in.password)
+    new_user = UserDb(
+        username=user_in.username, 
+        name=user_in.name, 
+        password=hashed_pass, 
+        role=user_in.role
+    )
+    
+    user_id = insert_user(new_user)
+    if user_id == -1:
+        raise HTTPException(status_code=500, detail="Error al crear el usuario en la base de datos")
+    
+    # Si el rol es TEACHER, DIRECTOR o ROOT, vincular en las tablas correspondientes
+    if user_in.role in ["TEACHER", "DIRECTOR", "ROOT"]:
+        insert_user_role(user_id, user_in.role)
+        
+    return get_user_by_id(user_id)
 
 # IMPORTAR PROFESORES JSON
 @router.post("/import", status_code=status.HTTP_201_CREATED)
