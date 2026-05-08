@@ -174,3 +174,20 @@ class TopStudentStats(BaseModel):
     surname: str
     student_group: str
     count: int
+
+# --- MODELOS DE HORARIOS ---
+class ScheduleBase(BaseModel):
+    day_of_week: int
+    start_time: time
+    end_time: time
+    student_group: str
+    subject: str
+
+class ScheduleCreate(ScheduleBase):
+    user_id: int
+
+class ScheduleOut(ScheduleBase):
+    id: int
+
+class ScheduleImportItem(ScheduleBase):
+    username: str
