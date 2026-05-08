@@ -52,7 +52,8 @@ async def create_user(
         username=user_in.username, 
         name=user_in.name, 
         password=hashed_pass, 
-        role=user_in.role
+        role=user_in.role,
+        department=user_in.department
     )
     
     user_id = insert_user(new_user)
@@ -87,6 +88,7 @@ async def import_teachers_from_json(
         email = user_data.get("email")
         nombre = user_data.get("nombre")
         contrasena = user_data.get("contrasena")
+        departamento = user_data.get("departamento")
 
         if not email or not nombre or not contrasena:
             continue
@@ -97,7 +99,7 @@ async def import_teachers_from_json(
 
         hashed_pass = get_hash_password(contrasena)
         new_teacher = UserDb(
-            username=email, name=nombre, password=hashed_pass, role="TEACHER"
+            username=email, name=nombre, password=hashed_pass, role="TEACHER", department=departamento
         )
         
         # Guardamos en USER

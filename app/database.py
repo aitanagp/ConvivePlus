@@ -22,8 +22,8 @@ def insert_user(user: UserDb) -> int:
     try:
         with mariadb.connect(**db_config) as conn:
             with conn.cursor() as cursor:
-                sql = "INSERT INTO USER (username, name, password, role) VALUES (?, ?, ?, ?)"
-                values = (user.username, user.name, user.password, user.role)
+                sql = "INSERT INTO USER (username, name, password, role, department) VALUES (?, ?, ?, ?, ?)"
+                values = (user.username, user.name, user.password, user.role, user.department)
                 cursor.execute(sql, values)
                 conn.commit()
                 return cursor.lastrowid
@@ -74,11 +74,11 @@ def get_student_id_by_email(email: str):
 def get_user_by_username(username: str) -> UserDb | None:
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
-            sql = "SELECT id, name, username, password, role FROM USER WHERE username = ?"
+            sql = "SELECT id, name, username, password, role, department FROM USER WHERE username = ?"
             cursor.execute(sql, (username,))
             result = cursor.fetchone()
             if result:
-                return UserDb(id=result[0], name=result[1], username=result[2], password=result[3], role=result[4])
+                return UserDb(id=result[0], name=result[1], username=result[2], password=result[3], role=result[4], department=result[5])
             return None      
             
 def get_user_by_email(email: str) -> UserDb | None:
@@ -88,22 +88,22 @@ def get_user_by_email(email: str) -> UserDb | None:
 def get_user_by_id(user_id: int) -> UserDb | None:
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
-            sql = "SELECT id, name, username, password, role FROM USER WHERE id = ?"
+            sql = "SELECT id, name, username, password, role, department FROM USER WHERE id = ?"
             cursor.execute(sql, (user_id,))
             result = cursor.fetchone()
             if result:
-                return UserDb(id=result[0], name=result[1], username=result[2], password=result[3], role=result[4])
+                return UserDb(id=result[0], name=result[1], username=result[2], password=result[3], role=result[4], department=result[5])
             return None
 
 def get_all_users_db() -> list[UserDb]:
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
-            sql = "SELECT id, name, username, password, role FROM USER"
+            sql = "SELECT id, name, username, password, role, department FROM USER"
             cursor.execute(sql)
             results = cursor.fetchall()
             # Convertimos cada tupla en un objeto UserDb
             return [
-                UserDb(id=row[0], name=row[1], username=row[2], password=row[3], role=row[4])
+                UserDb(id=row[0], name=row[1], username=row[2], password=row[3], role=row[4], department=row[5])
                 for row in results
             ]
 
@@ -126,11 +126,12 @@ def update_user_db(user_id: int, data: dict):
     new_name = data.get("name")
     new_username = data.get("username")
     new_role = data.get("role")
+    new_department = data.get("department")
 
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
-            sql = "UPDATE USER SET name = ?, username = ?, role = ? WHERE id = ?"
-            cursor.execute(sql, (new_name, new_username, new_role, user_id))
+            sql = "UPDATE USER SET name = ?, username = ?, role = ?, department = ? WHERE id = ?"
+            cursor.execute(sql, (new_name, new_username, new_role, new_department, user_id))
             conn.commit()
             return True
 

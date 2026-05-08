@@ -19,12 +19,14 @@ class UserIn(UserBase):
 class UserDb(UserIn):
     id: int | None = None
     role: str | None = None
+    department: str | None = None
 
 class UserOut(BaseModel):
     id: int
     name: str
     username: str
     role: str | None = None
+    department: str | None = None
 
 class UserLoginIn(UserBase):
     pass
@@ -35,11 +37,13 @@ class UserCreate(BaseModel):
     name: str
     password: str
     role: str = "TEACHER"
+    department: str | None = None
 
 class UserCreateJson(BaseModel):
     email: str
     nombre: str
     contrasena: str
+    departamento: str | None = None
 
 class UserEditJson(BaseModel):
     nombre: str
@@ -56,6 +60,7 @@ class UserUpdate(BaseModel):
     name: str
     username: str
     role: str
+    department: str | None = None
 
 # MODELOS DE ALUMNOS
 class StudentBase(BaseModel):
