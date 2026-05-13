@@ -18,9 +18,12 @@ router = APIRouter(prefix="/v1/students", tags=["Students"])
 
 # VER TODOS LOS ALUMNOS
 @router.get("/", response_model=List[StudentOut], status_code=status.HTTP_200_OK)
-async def get_all_students(current_user: UserDb = Depends(get_current_user)):
+async def get_all_students(
+    student_group: str = None,
+    current_user: UserDb = Depends(get_current_user)
+):
     # Obtenemos los alumnos desde la base de datos real
-    students_data = get_all_students_db()
+    students_data = get_all_students_db(student_group=student_group)
     
     # Convertimos los diccionarios a objetos Pydantic StudentOut
     return [StudentOut(**student) for student in students_data]

@@ -107,7 +107,7 @@ def get_all_users_db() -> list[UserDb]:
                 for row in results
             ]
 
-def get_all_students_db():
+def get_all_students_db(student_group=None):
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
             sql = """
@@ -115,7 +115,12 @@ def get_all_students_db():
                        (SELECT COUNT(*) FROM PROBI_RECOGNITION WHERE student_id = s.id AND status = 'APPROVED') > 0 as is_probi
                 FROM STUDENT s
             """
-            cursor.execute(sql)
+            params = []
+            if student_group:
+                sql += " WHERE s.student_group = ?"
+                params.append(student_group)
+                
+            cursor.execute(sql, tuple(params))
             result = cursor.fetchall()
             return [
                 {"id": r[0], "name": r[1], "surname": r[2], "email": r[3], "age": r[4], "student_group": r[5], "is_probi": bool(r[6])}

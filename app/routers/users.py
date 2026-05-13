@@ -33,7 +33,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     if not verify_password(form_data.password, user.password):
         raise HTTPException(status_code=400, detail="Usuario o contraseña incorrectos")
     
-    access_token = create_access_token(data={"sub": user.username, "role": user.role})
+    access_token = create_access_token(data={"sub": user.username, "role": user.role, "id": user.id})
     return {"access_token": access_token, "token_type": "bearer"}
     
 # CREAR USUARIO (INDIVIDUAL)
