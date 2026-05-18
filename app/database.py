@@ -107,7 +107,7 @@ def get_all_users_db() -> list[UserDb]:
                 for row in results
             ]
 
-def get_all_students_db():
+def get_all_students_db(student_group=None):
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
             sql = """
@@ -115,7 +115,12 @@ def get_all_students_db():
                        (SELECT COUNT(*) FROM PROBI_RECOGNITION WHERE student_id = s.id AND status = 'APPROVED') > 0 as is_probi
                 FROM STUDENT s
             """
-            cursor.execute(sql)
+            params = []
+            if student_group:
+                sql += " WHERE s.student_group = ?"
+                params.append(student_group)
+                
+            cursor.execute(sql, tuple(params))
             result = cursor.fetchall()
             return [
                 {"id": r[0], "name": r[1], "surname": r[2], "email": r[3], "age": r[4], "student_group": r[5], "is_probi": bool(r[6])}
@@ -706,3 +711,58 @@ def delete_probi_recognition(probi_id: int):
             cursor.execute("DELETE FROM PROBI_RECOGNITION WHERE id = ?", (probi_id,))
             conn.commit()
             return cursor.rowcount > 0
+# --- HORARIOS ---
+def get_schedules_db(user_id=None, student_group=None):
+    with mariadb.connect(**db_config) as conn:
+        cursor = conn.cursor(dictionary=True)
+        query = "SELECT s.id, s.day_of_week, s.start_time, s.end_time, s.student_group, s.subject FROM SCHEDULE s"
+        params = []
+        if user_id:
+            query += " JOIN USER_SCHEDULE us ON s.id = us.schedule_id WHERE us.user_id = ?"
+            params.append(user_id)
+        elif student_group:
+            query += " WHERE s.student_group = ?"
+            params.append(student_group)
+        
+        cursor.execute(query, params)
+        return cursor.fetchall()
+
+def insert_schedule_db(day_of_week, start_time, end_time, student_group, subject):
+    with mariadb.connect(**db_config) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO SCHEDULE (day_of_week, start_time, end_time, student_group, subject) VALUES (?, ?, ?, ?, ?)",
+            (day_of_week, start_time, end_time, student_group, subject)
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+def link_user_schedule_db(user_id, schedule_id):
+    with mariadb.connect(**db_config) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO USER_SCHEDULE (user_id, schedule_id) VALUES (?, ?)",
+            (user_id, schedule_id)
+        )
+        conn.commit()
+
+def delete_schedule_db(schedule_id):
+    with mariadb.connect(**db_config) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM SCHEDULE WHERE id = ?", (schedule_id,))
+        conn.commit()
+
+def get_students_by_schedule_id_db(schedule_id):
+    with mariadb.connect(**db_config) as conn:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT student_group FROM SCHEDULE WHERE id = ?", (schedule_id,))
+        sched = cursor.fetchone()
+        if not sched:
+            return []
+        group = sched['student_group']
+        cursor.execute("SELECT * FROM STUDENT WHERE student_group = ?", (group,))
+        students = cursor.fetchall()
+        for s in students:
+            cursor.execute("SELECT 1 FROM LOG_ATTITUDE la JOIN ATTITUDE a ON la.attitude_id = a.id WHERE la.user_id = ? LIMIT 1", (s['id'],))
+            s['is_probi'] = cursor.fetchone() is not None
+        return students

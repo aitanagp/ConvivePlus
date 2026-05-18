@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from app.routers import (
     students, users, attitudes, 
     classroom, records, academic_years,
-    stats, probi
+    stats, probi, schedules
 )
 
 app = FastAPI(debug=True)
@@ -15,6 +15,7 @@ app.include_router(records.router)
 app.include_router(academic_years.router)
 app.include_router(stats.router)
 app.include_router(probi.router)
+app.include_router(schedules.router)
 
 @app.get("/")
 async def root():

@@ -62,6 +62,8 @@ CREATE TABLE SCHEDULE (
   day_of_week TINYINT NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
+  student_group VARCHAR(50) NOT NULL,
+  subject VARCHAR(100) NOT NULL,
   CHECK (end_time > start_time),
   CHECK (day_of_week BETWEEN 1 AND 7)
 );
