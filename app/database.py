@@ -716,19 +716,44 @@ def get_schedules_db(user_id=None, student_group=None):
     from datetime import time, timedelta
     with mariadb.connect(**db_config) as conn:
         cursor = conn.cursor(dictionary=True)
-        query = """
-            SELECT s.id, s.day_of_week, s.start_time, s.end_time, s.student_group, s.subject, u.username
-            FROM SCHEDULE s
-            LEFT JOIN USER_SCHEDULE us ON s.id = us.schedule_id
-            LEFT JOIN USER u ON us.user_id = u.id
-        """
-        params = []
-        if user_id:
-            query += " WHERE us.user_id = ?"
-            params.append(user_id)
-        elif student_group:
-            query += " WHERE s.student_group = ?"
-            params.append(student_group)
+        
+        # Miramos si hay algún curso escolar activo
+        cursor.execute("SELECT id FROM ACADEMIC_YEAR WHERE is_active = TRUE LIMIT 1")
+        resultado_curso = cursor.fetchone()
+        
+        if resultado_curso is not None:
+            # Si hay un curso activo, solo mostramos los horarios vinculados a él
+            id_curso = resultado_curso['id'] if isinstance(resultado_curso, dict) else resultado_curso[0]
+            query = """
+                SELECT s.id, s.day_of_week, s.start_time, s.end_time, s.student_group, s.subject, u.username
+                FROM SCHEDULE s
+                JOIN YEAR_SCHEDULE ys ON s.id = ys.schedule_id
+                LEFT JOIN USER_SCHEDULE us ON s.id = us.schedule_id
+                LEFT JOIN USER u ON us.user_id = u.id
+                WHERE ys.year_id = ?
+            """
+            params = [id_curso]
+            if user_id:
+                query += " AND us.user_id = ?"
+                params.append(user_id)
+            elif student_group:
+                query += " AND s.student_group = ?"
+                params.append(student_group)
+        else:
+            # Si no hay cursos en la base de datos, enseñamos todos los horarios para que no falle nada
+            query = """
+                SELECT s.id, s.day_of_week, s.start_time, s.end_time, s.student_group, s.subject, u.username
+                FROM SCHEDULE s
+                LEFT JOIN USER_SCHEDULE us ON s.id = us.schedule_id
+                LEFT JOIN USER u ON us.user_id = u.id
+            """
+            params = []
+            if user_id:
+                query += " WHERE us.user_id = ?"
+                params.append(user_id)
+            elif student_group:
+                query += " WHERE s.student_group = ?"
+                params.append(student_group)
         
         cursor.execute(query, params)
         results = cursor.fetchall()
@@ -744,12 +769,28 @@ def get_schedules_db(user_id=None, student_group=None):
 def insert_schedule_db(day_of_week, start_time, end_time, student_group, subject):
     with mariadb.connect(**db_config) as conn:
         cursor = conn.cursor()
+        
+        # Primero metemos el horario nuevo en la tabla de SCHEDULE
         cursor.execute(
             "INSERT INTO SCHEDULE (day_of_week, start_time, end_time, student_group, subject) VALUES (?, ?, ?, ?, ?)",
             (day_of_week, start_time, end_time, student_group, subject)
         )
+        schedule_id = cursor.lastrowid
+        
+        # Ahora miramos si hay algún curso escolar activo para vincularlo
+        cursor.execute("SELECT id FROM ACADEMIC_YEAR WHERE is_active = TRUE LIMIT 1")
+        resultado_curso = cursor.fetchone()
+        
+        if resultado_curso is not None:
+            # Si hay un curso activo, lo metemos en la tabla intermedia YEAR_SCHEDULE
+            id_curso = resultado_curso[0]
+            cursor.execute(
+                "INSERT INTO YEAR_SCHEDULE (year_id, schedule_id) VALUES (?, ?)",
+                (id_curso, schedule_id)
+            )
+            
         conn.commit()
-        return cursor.lastrowid
+        return schedule_id
 
 def link_user_schedule_db(user_id, schedule_id):
     with mariadb.connect(**db_config) as conn:
