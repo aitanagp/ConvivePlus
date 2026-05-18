@@ -713,19 +713,33 @@ def delete_probi_recognition(probi_id: int):
             return cursor.rowcount > 0
 # --- HORARIOS ---
 def get_schedules_db(user_id=None, student_group=None):
+    from datetime import time, timedelta
     with mariadb.connect(**db_config) as conn:
         cursor = conn.cursor(dictionary=True)
-        query = "SELECT s.id, s.day_of_week, s.start_time, s.end_time, s.student_group, s.subject FROM SCHEDULE s"
+        query = """
+            SELECT s.id, s.day_of_week, s.start_time, s.end_time, s.student_group, s.subject, u.username
+            FROM SCHEDULE s
+            LEFT JOIN USER_SCHEDULE us ON s.id = us.schedule_id
+            LEFT JOIN USER u ON us.user_id = u.id
+        """
         params = []
         if user_id:
-            query += " JOIN USER_SCHEDULE us ON s.id = us.schedule_id WHERE us.user_id = ?"
+            query += " WHERE us.user_id = ?"
             params.append(user_id)
         elif student_group:
             query += " WHERE s.student_group = ?"
             params.append(student_group)
         
         cursor.execute(query, params)
-        return cursor.fetchall()
+        results = cursor.fetchall()
+        for r in results:
+            if isinstance(r['start_time'], timedelta):
+                total_secs = int(r['start_time'].total_seconds())
+                r['start_time'] = time(total_secs // 3600, (total_secs % 3600) // 60, total_secs % 60)
+            if isinstance(r['end_time'], timedelta):
+                total_secs = int(r['end_time'].total_seconds())
+                r['end_time'] = time(total_secs // 3600, (total_secs % 3600) // 60, total_secs % 60)
+        return results
 
 def insert_schedule_db(day_of_week, start_time, end_time, student_group, subject):
     with mariadb.connect(**db_config) as conn:
@@ -751,6 +765,25 @@ def delete_schedule_db(schedule_id):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM SCHEDULE WHERE id = ?", (schedule_id,))
         conn.commit()
+
+def update_schedule_db(schedule_id, day_of_week, start_time, end_time, student_group, subject, username):
+    user = get_user_by_username(username)
+    if not user:
+        return False
+    try:
+        with mariadb.connect(**db_config) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE SCHEDULE SET day_of_week = ?, start_time = ?, end_time = ?, student_group = ?, subject = ? WHERE id = ?",
+                    (day_of_week, start_time, end_time, student_group, subject, schedule_id)
+                )
+                cursor.execute("DELETE FROM USER_SCHEDULE WHERE schedule_id = ?", (schedule_id,))
+                cursor.execute("INSERT INTO USER_SCHEDULE (user_id, schedule_id) VALUES (?, ?)", (user.id, schedule_id))
+                conn.commit()
+                return True
+    except mariadb.Error as e:
+        print(f"Error actualizando horario: {e}")
+        return False
 
 def get_students_by_schedule_id_db(schedule_id):
     with mariadb.connect(**db_config) as conn:

@@ -188,6 +188,7 @@ class ScheduleCreate(ScheduleBase):
 
 class ScheduleOut(ScheduleBase):
     id: int
+    username: str | None = None
 
 class ScheduleImportItem(ScheduleBase):
     username: str

@@ -3,7 +3,8 @@ from typing import List
 from app.models import ScheduleOut, ScheduleCreate, ScheduleImportItem, StudentOut
 from app.database import (
     get_schedules_db, insert_schedule_db, link_user_schedule_db, 
-    delete_schedule_db, get_students_by_schedule_id_db, get_user_by_username
+    delete_schedule_db, get_students_by_schedule_id_db, get_user_by_username,
+    update_schedule_db
 )
 from app.dependencies import get_current_user
 
@@ -33,6 +34,16 @@ async def delete_schedule(schedule_id: int, current_user=Depends(get_current_use
     delete_schedule_db(schedule_id)
     return {"message": "Schedule deleted successfully"}
 
+@router.put("/{schedule_id}")
+async def update_schedule(schedule_id: int, schedule: ScheduleImportItem, current_user=Depends(get_current_user)):
+    success = update_schedule_db(
+        schedule_id, schedule.day_of_week, schedule.start_time, schedule.end_time,
+        schedule.student_group, schedule.subject, schedule.username
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail="Error al actualizar el horario. Verifique que el profesor exista.")
+    return {"message": "Schedule updated successfully"}
+
 @router.post("/import/")
 async def import_schedules(schedules: List[ScheduleImportItem], current_user=Depends(get_current_user)):
     count = 0
@@ -43,7 +54,7 @@ async def import_schedules(schedules: List[ScheduleImportItem], current_user=Dep
                 s.day_of_week, s.start_time, s.end_time,
                 s.student_group, s.subject
             )
-            link_user_schedule_db(user['id'], sid)
+            link_user_schedule_db(user.id, sid)
             count += 1
     return {"message": f"{count} schedules imported successfully"}
 
