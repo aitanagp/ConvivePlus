@@ -229,6 +229,41 @@ def get_attitudes_db(teacher_id=None):
                 for r in rows
             ]
 
+def get_student_attitudes_db(student_id: int):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT a.id, a.description, 'WARNING' as type, a.created_at, u.name as teacher_name
+                FROM ATTITUDE a
+                JOIN STUDENT_WARNING sw ON a.id = sw.warning_id
+                JOIN LOG_ATTITUDE la ON a.id = la.attitude_id
+                JOIN USER u ON la.user_id = u.id
+                WHERE sw.student_id = ?
+                
+                UNION ALL
+                
+                SELECT a.id, a.description, 'RECOGNITION' as type, a.created_at, u.name as teacher_name
+                FROM ATTITUDE a
+                JOIN STUDENT_RECOGNITION sr ON a.id = sr.recognition_id
+                JOIN LOG_ATTITUDE la ON a.id = la.attitude_id
+                JOIN USER u ON la.user_id = u.id
+                WHERE sr.student_id = ?
+                
+                ORDER BY created_at DESC
+            """
+            cursor.execute(sql, (student_id, student_id))
+            rows = cursor.fetchall()
+            return [
+                {
+                    "id": r[0],
+                    "description": r[1],
+                    "type": r[2],
+                    "created_at": str(r[3]),
+                    "teacher_name": r[4]
+                }
+                for r in rows
+            ]
+
 def get_attitude_owner_id(attitude_id):
     """Para saber quién creó la actitud y si puede borrarla/editarla"""
     with mariadb.connect(**db_config) as conn:

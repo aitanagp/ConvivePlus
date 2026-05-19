@@ -68,6 +68,12 @@ async def list_my_attitudes(current_user = Depends(get_current_user)):
     # Los profes solo ven las suyas
     return get_attitudes_db(teacher_id=current_user.id)
 
+# OBTENER ACTITUDES DE UN ALUMNO (Timeline)
+@router.get("/{student_id}")
+async def list_student_attitudes(student_id: int, current_user = Depends(get_current_user)):
+    from app.database import get_student_attitudes_db
+    return get_student_attitudes_db(student_id)
+
 @router.put("/{attitude_id}")
 async def update_attitude(
     attitude_id: int, 

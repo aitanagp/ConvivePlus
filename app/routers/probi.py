@@ -97,3 +97,16 @@ def approve_probi(probi_id: int, current_user: UserDb = Depends(get_current_user
                 raise HTTPException(status_code=404, detail="Reconocimiento no encontrado.")
             conn.commit()
     return {"message": "Reconocimiento aprobado exitosamente."}
+
+# OBTENER RECONOCIMIENTOS PROBI DE UN ESTUDIANTE
+@router.get("/student/{student_id}")
+def get_student_probi(student_id: int, current_user = Depends(get_current_user)):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = "SELECT id, status, justification, created_at FROM PROBI_RECOGNITION WHERE student_id = ?"
+            cursor.execute(sql, (student_id,))
+            rows = cursor.fetchall()
+            return [
+                {"id": r[0], "status": r[1], "justification": r[2], "created_at": str(r[3])}
+                for r in rows
+            ]
