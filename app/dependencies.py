@@ -16,7 +16,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     return user
 
 async def get_current_admin(current_user: UserDb = Depends(get_current_user)):
-    # Verifica si el rol es admin (ajusta 'admin' si en tu BD se llama 'ROOT' o 'DIRECTOR')
+    # Verifica si el rol es admin
     if current_user.role != 'admin' and current_user.role != 'ROOT' and current_user.role != 'DIRECTOR': 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

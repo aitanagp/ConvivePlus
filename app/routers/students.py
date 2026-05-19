@@ -62,7 +62,7 @@ async def create_student(student_in: StudentIn, current_user: UserDb = Depends(g
 async def update_student(id: int, student_update: StudentUpdate, current_user: UserDb = Depends(get_current_user)):
     # Solo pueden editar Admin (ROOT) o Dirección (DIRECTOR)
     if current_user.role != 'ROOT' and current_user.role != 'DIRECTOR':
-        raise HTTPException(status_code=403, detail="No tienes permiso para editar alumnos. Habla con el jefe!")
+        raise HTTPException(status_code=403, detail="No tienes permiso para editar alumnos.")
 
     # Intento actualizar en la base de datos
     success = update_student_db(id, student_update)
@@ -78,11 +78,11 @@ async def update_student(id: int, student_update: StudentUpdate, current_user: U
 async def delete_student(id: int, current_user: UserDb = Depends(get_current_user)):
     # Solo el admin o el dire pueden borrar a alguien
     if current_user.role != 'ROOT' and current_user.role != 'DIRECTOR':
-        raise HTTPException(status_code=403, detail="Tú no mandas aquí para borrar alumnos!")
+        raise HTTPException(status_code=403, detail="No tienes permiso para borrar alumnos.")
 
     # Miro si existe antes de intentar borrar
     if not get_student_by_id_db(id):
-        raise HTTPException(status_code=404, detail="Ese alumno ya no estaba o el ID está mal")
+        raise HTTPException(status_code=404, detail="Ese alumno no esta en la base de datos")
 
     # Borro de la base de datos (esta función ya limpia las actitudes)
     if delete_student_db(id):

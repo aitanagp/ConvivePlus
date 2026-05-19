@@ -29,7 +29,7 @@ async def add_attitude(
     datos: CreateAttitude,
     current_user = Depends(get_current_user)
 ):
-    # Buscar el ID del alumno (usando tu función existente)
+    # Buscar el ID del alumno
     student_id = get_student_id_by_email(datos.student_email)
     
     if not student_id:
