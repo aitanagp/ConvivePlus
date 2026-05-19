@@ -13,7 +13,8 @@ from app.database import (
     insert_teacher_link,
     get_all_users_db,
     get_user_by_id,
-    update_user_db
+    update_user_db,
+    insert_user_role
 )
 from app.auth.auth import (
     get_hash_password, 

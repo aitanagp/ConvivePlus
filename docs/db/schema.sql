@@ -219,3 +219,7 @@ CREATE TABLE RECORD_ATTITUDE (
   FOREIGN KEY (record_id) REFERENCES DISCIPLINARY_RECORD(id) ON DELETE CASCADE,
   FOREIGN KEY (attitude_id) REFERENCES ATTITUDE(id) ON DELETE CASCADE
 );
+
+-- Insert default admin user
+INSERT INTO USER (username, name, password, role) VALUES ('admin', 'Administrador', '$2b$12$F.FBtMAO0ryEssyFxErOKO43ZB11lcbAawiKeq7XvHCXdVLuhTfPy', 'ROOT');
+INSERT INTO ROOT (user_id) SELECT id FROM USER WHERE username = 'admin';
