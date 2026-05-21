@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: ./docker/fastapi/Dockerfile
+    restart: unless-stopped
     ports:
       - 8000:80
     networks:
@@ -14,6 +15,7 @@ services:
 
   myapidb:
     image: mariadb
+    restart: unless-stopped
     environment:
       MARIADB_ROOT_PASSWORD: root
       MARIADB_USER: myapi
@@ -28,6 +30,7 @@ services:
 
   myapiadminer:
     image: adminer
+    restart: unless-stopped
     ports:
       - 8080:8080
     networks:

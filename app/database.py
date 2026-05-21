@@ -527,6 +527,75 @@ def get_pending_records_db():
                 for r in rows
             ]
 
+def get_all_records_db():
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT dr.id, s.name, s.surname, dr.start_date, dr.status, dr.observations
+                FROM DISCIPLINARY_RECORD dr
+                JOIN STUDENT s ON dr.student_id = s.id
+                ORDER BY dr.start_date DESC
+            """
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            return [
+                {
+                    "id": r[0],
+                    "student_name": f"{r[1]} {r[2]}",
+                    "start_date": str(r[3]),
+                    "status": r[4],
+                    "observations": r[5]
+                }
+                for r in rows
+            ]
+
+def get_record_detail_db(record_id: int):
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            # 1. Get record info
+            sql_record = """
+                SELECT dr.id, dr.student_id, s.name, s.surname, dr.start_date, dr.status, dr.observations
+                FROM DISCIPLINARY_RECORD dr
+                JOIN STUDENT s ON dr.student_id = s.id
+                WHERE dr.id = ?
+            """
+            cursor.execute(sql_record, (record_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            
+            # 2. Get warnings
+            sql_warnings = """
+                SELECT a.id, a.description, a.created_at, u.name as teacher_name
+                FROM ATTITUDE a
+                JOIN RECORD_ATTITUDE ra ON a.id = ra.attitude_id
+                JOIN LOG_ATTITUDE la ON a.id = la.attitude_id
+                JOIN USER u ON la.user_id = u.id
+                WHERE ra.record_id = ?
+            """
+            cursor.execute(sql_warnings, (record_id,))
+            warning_rows = cursor.fetchall()
+            warnings = [
+                {
+                    "id": w[0],
+                    "description": w[1],
+                    "created_at": str(w[2]),
+                    "teacher_name": w[3]
+                }
+                for w in warning_rows
+            ]
+            
+            return {
+                "id": row[0],
+                "student_id": row[1],
+                "student_name": f"{row[2]} {row[3]}",
+                "start_date": str(row[4]),
+                "status": row[5],
+                "observations": row[6],
+                "warnings": warnings
+            }
+
+
 # --- FUNCIONES PARA CURSOS ACADÉMICOS ---
 
 def insert_academic_year_db(year: AcademicYearIn):

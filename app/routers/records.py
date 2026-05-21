@@ -6,7 +6,9 @@ from app.database import (
     open_disciplinary_record_db,
     get_student_records_db,
     update_record_status_db,
-    get_pending_records_db
+    get_pending_records_db,
+    get_all_records_db,
+    get_record_detail_db
 )
 from app.dependencies import get_current_user
 
@@ -24,6 +26,25 @@ async def open_record(record_in: DisciplinaryRecordOpen, current_user: UserDb = 
         raise HTTPException(status_code=400, detail="No se ha podido abrir el expediente. Comprueba que las amonestaciones sean correctas.")
     
     return {"message": "Expediente abierto correctamente", "id": record_id}
+
+# LISTADO DE TODOS LOS EXPEDIENTES
+@router.get("/all", status_code=status.HTTP_200_OK)
+async def get_all_records(current_user: UserDb = Depends(get_current_user)):
+    if current_user.role not in ['DIRECTOR', 'ROOT']:
+        raise HTTPException(status_code=403, detail="No tienes permiso")
+    
+    return get_all_records_db()
+
+# CONSULTAR DETALLE DE UN EXPEDIENTE
+@router.get("/detail/{record_id}", status_code=status.HTTP_200_OK)
+async def get_record_detail(record_id: int, current_user: UserDb = Depends(get_current_user)):
+    if current_user.role not in ['DIRECTOR', 'ROOT']:
+        raise HTTPException(status_code=403, detail="No tienes permiso")
+    
+    detail = get_record_detail_db(record_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Expediente no encontrado")
+    return detail
 
 # CONSULTAR HISTORIAL DE UN ALUMNO
 @router.get("/{student_id}", status_code=status.HTTP_200_OK)
@@ -51,3 +72,4 @@ async def get_pending(current_user: UserDb = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="No tienes permiso")
     
     return get_pending_records_db()
+
