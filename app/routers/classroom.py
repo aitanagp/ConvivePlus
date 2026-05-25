@@ -8,7 +8,8 @@ from app.database import (
     get_daily_classroom_students,
     insert_classroom_task,
     update_classroom_attendance,
-    get_student_tasks_report
+    get_student_tasks_report,
+    update_classroom_task_status_db
 )
 from app.dependencies import get_current_user
 
@@ -80,3 +81,18 @@ async def get_report(assignment_id: int, current_user: UserDb = Depends(get_curr
         "completed_count": len([t for t in tasks if t["status"] == "COMPLETED"]),
         "total_count": len(tasks)
     }
+
+# ACTUALIZAR ESTADO DE UNA TAREA
+@router.patch("/tasks/{task_id}/status", status_code=status.HTTP_200_OK)
+async def update_task_status(task_id: int, status_update: dict, current_user: UserDb = Depends(get_current_user)):
+    if current_user.role not in ['ROOT', 'DIRECTOR', 'TEACHER']:
+        raise HTTPException(status_code=403, detail="No tienes permiso para actualizar tareas")
+    
+    status_val = status_update.get("status")
+    if not status_val or status_val not in ["PENDING", "COMPLETED"]:
+        raise HTTPException(status_code=400, detail="Estado no válido. Debe ser PENDING o COMPLETED")
+    
+    if update_classroom_task_status_db(task_id, status_val):
+        return {"message": "Estado de la tarea actualizado"}
+    else:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada")

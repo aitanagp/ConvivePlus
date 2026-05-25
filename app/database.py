@@ -393,12 +393,13 @@ def get_daily_classroom_students(today, time_filter=None):
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
             sql = """
-                SELECT ca.id, s.name, s.surname, ca.start_time, ca.end_time
+                SELECT ca.id, s.name, s.surname, ca.start_time, ca.end_time,
+                       (SELECT status FROM CLASSROOM_ATTENDANCE WHERE assignment_id = ca.id AND attendance_date = ?) as attendance_status
                 FROM CLASSROOM_ASSIGNMENT ca
                 JOIN STUDENT s ON ca.student_id = s.id
                 WHERE ca.start_date <= ? AND ca.end_date >= ?
             """
-            params = [today, today]
+            params = [today, today, today]
             if time_filter:
                 sql += " AND ca.start_time <= ? AND ca.end_time >= ?"
                 params.extend([time_filter, time_filter])
@@ -406,7 +407,14 @@ def get_daily_classroom_students(today, time_filter=None):
             cursor.execute(sql, tuple(params))
             rows = cursor.fetchall()
             return [
-                {"assignment_id": r[0], "name": r[1], "surname": r[2], "start_time": str(r[3]), "end_time": str(r[4])}
+                {
+                    "assignment_id": r[0],
+                    "name": r[1],
+                    "surname": r[2],
+                    "start_time": str(r[3]),
+                    "end_time": str(r[4]),
+                    "attendance_status": r[5] or "AUSENTE"
+                }
                 for r in rows
             ]
 
@@ -446,14 +454,26 @@ def update_classroom_attendance(attendance: AttendanceUpdate):
         print(f"Error en asistencia: {e}")
         return False
 
+def update_classroom_task_status_db(task_id: int, status: str):
+    try:
+        with mariadb.connect(**db_config) as conn:
+            with conn.cursor() as cursor:
+                sql = "UPDATE CLASSROOM_TASK SET status = ? WHERE id = ?"
+                cursor.execute(sql, (status, task_id))
+                conn.commit()
+                return cursor.rowcount > 0
+    except mariadb.Error as e:
+        print(f"Error al actualizar estado de tarea: {e}")
+        return False
+
 def get_student_tasks_report(assignment_id: int):
     # Saco las tareas para el reporte
     with mariadb.connect(**db_config) as conn:
         with conn.cursor() as cursor:
-            sql = "SELECT description, status FROM CLASSROOM_TASK WHERE assignment_id = ?"
+            sql = "SELECT id, description, status FROM CLASSROOM_TASK WHERE assignment_id = ?"
             cursor.execute(sql, (assignment_id,))
             rows = cursor.fetchall()
-            return [{"task": r[0], "status": r[1]} for r in rows]
+            return [{"id": r[0], "task": r[1], "status": r[2]} for r in rows]
 
 # --- FUNCIONES PARA EXPEDIENTES DISCIPLINARIOS ---
 
