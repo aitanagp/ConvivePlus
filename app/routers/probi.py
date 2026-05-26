@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from app.database import (
     init_probi_table, insert_probi_nomination, get_probi_hall_of_fame,
-    get_probi_suggestions, delete_probi_recognition
+    get_probi_suggestions, delete_probi_recognition, get_probi_pending_db
 )
 from app.dependencies import get_current_user
 from app.models import UserDb
@@ -70,6 +70,12 @@ def hall_of_fame():
                 {"id": r[0], "student_name": f"{r[1]} {r[2]}", "teacher_name": r[3], "justification": r[4], "created_at": str(r[5])}
                 for r in rows
             ]
+
+@router.get("/pending", response_model=List[ProbiOut])
+def get_pending_nominations(current_user: UserDb = Depends(get_current_user)):
+    if current_user.role not in ["DIRECTOR", "ROOT"]:
+        raise HTTPException(status_code=403, detail="Solo el equipo directivo tiene acceso a las nominaciones pendientes.")
+    return get_probi_pending_db()
 
 @router.get("/suggestions", response_model=List[SuggestionOut])
 def suggestions():
