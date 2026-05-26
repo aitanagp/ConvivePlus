@@ -835,6 +835,23 @@ def delete_probi_recognition(probi_id: int):
             cursor.execute("DELETE FROM PROBI_RECOGNITION WHERE id = ?", (probi_id,))
             conn.commit()
             return cursor.rowcount > 0
+
+def get_probi_pending_db():
+    with mariadb.connect(**db_config) as conn:
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT p.id, s.name, s.surname, u.name as teacher_name, p.justification, p.created_at
+                FROM PROBI_RECOGNITION p
+                JOIN STUDENT s ON p.student_id = s.id
+                JOIN USER u ON p.teacher_id = u.id
+                WHERE p.status = 'PENDING'
+            """
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            return [
+                {"id": r[0], "student_name": f"{r[1]} {r[2]}", "teacher_name": r[3], "justification": r[4], "created_at": str(r[5])}
+                for r in rows
+            ]
 # --- HORARIOS ---
 def get_schedules_db(user_id=None, student_group=None):
     from datetime import time, timedelta
